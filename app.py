@@ -23,14 +23,17 @@ def group_transactions_by_narration_suffix(df):
     
     for col in df.columns:
         col_lower = str(col).lower()
+        print(col_lower)
         if 'narration' in col_lower or 'description' in col_lower or 'particulars' in col_lower:
             narration_col = col
         elif 'withdrawal' in col_lower or 'debit' in col_lower:
             withdrawal_col = col
         elif 'deposit' in col_lower or 'credit' in col_lower:
             deposit_col = col
+        elif 'date' in col_lower:
+            date_col = col
             
-    st.info(f"Identified Columns: Narration='{narration_col}', Withdrawal='{withdrawal_col}', Deposit='{deposit_col}'")
+    st.info(f"Identified Columns: Narration='{narration_col}', Withdrawal='{withdrawal_col}', Deposit='{deposit_col}', Date='{date_col}")
 
     if not narration_col:
         st.error("Could not automatically find the 'Narration' column. Please ensure your Excel file has a column with a name like 'Narration', 'Description', or 'Particulars'.")
@@ -65,7 +68,7 @@ def group_transactions_by_narration_suffix(df):
             group_key = "Other"
         
         withdrawal, deposit = 0.0, 0.0
-        
+        date = 'NA'
         if withdrawal_col and pd.notna(row[withdrawal_col]):
             try:
                 withdrawal = float(str(row[withdrawal_col]).replace(',', ''))
@@ -78,10 +81,17 @@ def group_transactions_by_narration_suffix(df):
             except (ValueError, TypeError):
                 pass # Keep as 0
         
+        if date_col and pd.notna(row[date_col]):
+            try:
+                date = str(row[date_col])
+            except (ValueError, TypeError):
+                pass # Keep as 0
+
+        
+        data_key = f'{date} - {group_key}'
+
         if withdrawal > 0:
-            grouped_data[group_key]['withdrawals'].append(withdrawal)
-        if deposit > 0:
-            grouped_data[group_key]['deposits'].append(deposit)
+            grouped_data[data_key]['withdrawals'] = withdrawal
 
     return grouped_data
 
@@ -90,9 +100,9 @@ def create_excel_output_bytes(grouped_data):
     Creates the Excel file in memory and returns it as bytes.
     """
     excel_data = []
-    for group_key, data in grouped_data.items():
-        total_withdrawal = sum(data['withdrawals'])
-        total_deposit = sum(data['deposits'])
+    for data_key, data in grouped_data.items():
+        total_withdrawal = data['withdrawals']
+        group_key = data_key.split('-')[-1].strip()
 
         if group_key in abbreviation_map:
             description = abbreviation_map[group_key]['Description'],
@@ -102,16 +112,13 @@ def create_excel_output_bytes(grouped_data):
             category = 'NA'
             
         excel_data.append({
-            'Group_Key': group_key,
+            'Data_Key': data_key,
             'Description': description,
             "Category": category,
-            'Total_Withdrawal': total_withdrawal,
-            'Total_Deposit': total_deposit,
-            'Net_Amount': total_deposit - total_withdrawal,
-            'Transaction_Count': len(data['withdrawals']) + len(data['deposits'])
+            'Total_Withdrawal': total_withdrawal
         })
     
-    df_summary = pd.DataFrame(excel_data).sort_values('Group_Key').reset_index(drop=True)
+    df_summary = pd.DataFrame(excel_data).sort_values('Data_Key').reset_index(drop=True)
     
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
