@@ -2,10 +2,15 @@ import streamlit as st
 import pandas as pd
 from collections import defaultdict
 from io import BytesIO
+import json
 
 st.set_page_config(page_title="Excel Transaction Grouper", layout="wide")
 
 # --- Core processing functions adapted for Streamlit ---
+
+abbreviation = "{\"TIF Rent\":{\"Description\":\"Tiffin\",\"Category\":\"Tiffin\"},\"Ext LB\":{\"Description\":\"External Labour\",\"Category\":\"External Labour\"},\"Petrol\":{\"Description\":\"Petrol\",\"Category\":\"Transport\"},\"ptr\":{\"Description\":\"Petrol\",\"Category\":\"Transport\"},\"Tif Ptr\":{\"Description\":\"Tiffin\",\"Category\":\"Tiffin\"},\"Adv\":{\"Description\":\"Pinu\",\"Category\":\"Transport\"},\"Pinu\":{\"Description\":\"Pinu\",\"Category\":\"Transport\"},\"Bike\":{\"Description\":\"Bike\",\"Category\":\"Transport\"},\"Bharat\":{\"Description\":\"Bharat\",\"Category\":\"Bharat\"},\"Weed ptr\":{\"Description\":\"Weed Petrol\",\"Category\":\"Weed\"},\"Weed\":{\"Description\":\"Weed\",\"Category\":\"Weed\"},\"wd\":{\"Description\":\"Weed\",\"Category\":\"Weed\"},\"Tif\":{\"Description\":\"Tiffin\",\"Category\":\"Tiffin\"},\"Gas\":{\"Description\":\"Gas\",\"Category\":\"Transport\"},\"Plants\":{\"Description\":\"Plants\",\"Category\":\"Plants\"},\"Seeds\":{\"Description\":\"Seeds\",\"Category\":\"Seeds\"},\"Help\":{\"Description\":\"Helper\",\"Category\":\"Helper\"},\"Helper\":{\"Description\":\"Helper\",\"Category\":\"Helper\"},\"Nanu\":{\"Description\":\"Nanu\",\"Category\":\"Nanu\"},\"Suresh\":{\"Description\":\"Suresh\",\"Category\":\"Suresh\"},\"Jeev\":{\"Description\":\"Jeevamrut\",\"Category\":\"Fertilizer\"},\"Tempo Ptr\":{\"Description\":\"Tempo Petrol\",\"Category\":\"Transport\"}}"
+
+abbreviation_map = json.loads(abbreviation)
 
 def group_transactions_by_narration_suffix(df):
     """
@@ -48,28 +53,36 @@ def group_transactions_by_narration_suffix(df):
 
         narration = str(row[narration_col]) if pd.notna(row[narration_col]) else ""
         
-        if len(narration) >= 3:
-            suffix = narration[-3:].upper()
-            
-            withdrawal, deposit = 0.0, 0.0
-            
-            if withdrawal_col and pd.notna(row[withdrawal_col]):
-                try:
-                    withdrawal = float(str(row[withdrawal_col]).replace(',', ''))
-                except (ValueError, TypeError):
-                    pass # Keep as 0 if conversion fails
-            
-            if deposit_col and pd.notna(row[deposit_col]):
-                try:
-                    deposit = float(str(row[deposit_col]).replace(',', ''))
-                except (ValueError, TypeError):
-                    pass # Keep as 0
-            
-            if withdrawal > 0:
-                grouped_data[suffix]['withdrawals'].append(withdrawal)
-            if deposit > 0:
-                grouped_data[suffix]['deposits'].append(deposit)
-    
+        matched_key = None
+        for key in abbreviation_map.keys():
+            if key.lower() in narration.lower():
+                matched_key = key
+                break
+
+        if matched_key:
+            group_key = matched_key
+        else:
+            group_key = "Other"
+        
+        withdrawal, deposit = 0.0, 0.0
+        
+        if withdrawal_col and pd.notna(row[withdrawal_col]):
+            try:
+                withdrawal = float(str(row[withdrawal_col]).replace(',', ''))
+            except (ValueError, TypeError):
+                pass # Keep as 0 if conversion fails
+        
+        if deposit_col and pd.notna(row[deposit_col]):
+            try:
+                deposit = float(str(row[deposit_col]).replace(',', ''))
+            except (ValueError, TypeError):
+                pass # Keep as 0
+        
+        if withdrawal > 0:
+            grouped_data[group_key]['withdrawals'].append(withdrawal)
+        if deposit > 0:
+            grouped_data[group_key]['deposits'].append(deposit)
+
     return grouped_data
 
 def create_excel_output_bytes(grouped_data):
@@ -77,18 +90,28 @@ def create_excel_output_bytes(grouped_data):
     Creates the Excel file in memory and returns it as bytes.
     """
     excel_data = []
-    for suffix, data in grouped_data.items():
+    for group_key, data in grouped_data.items():
         total_withdrawal = sum(data['withdrawals'])
         total_deposit = sum(data['deposits'])
+
+        if group_key in abbreviation_map:
+            description = abbreviation_map[group_key]['Description'],
+            category = abbreviation_map[group_key]['Category']
+        else:
+            description = 'NA',
+            category = 'NA'
+            
         excel_data.append({
-            'Narration_Suffix': suffix,
+            'Group_Key': group_key,
+            'Description': description,
+            "Category": category,
             'Total_Withdrawal': total_withdrawal,
             'Total_Deposit': total_deposit,
             'Net_Amount': total_deposit - total_withdrawal,
             'Transaction_Count': len(data['withdrawals']) + len(data['deposits'])
         })
     
-    df_summary = pd.DataFrame(excel_data).sort_values('Narration_Suffix').reset_index(drop=True)
+    df_summary = pd.DataFrame(excel_data).sort_values('Group_Key').reset_index(drop=True)
     
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:

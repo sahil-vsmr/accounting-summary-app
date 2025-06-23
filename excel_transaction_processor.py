@@ -3,6 +3,34 @@ import numpy as np
 from collections import defaultdict
 import os
 
+
+abbreviation_map = {
+  "TIF Rent": { "Description": "Tiffin", "Category": "Tiffin" },
+  "Ext LB": { "Description": "External Labour", "Category": "External Labour" },
+  "Petrol": { "Description": "Petrol", "Category": "Transport" },
+  "ptr": { "Description": "Petrol", "Category": "Transport" },
+  "Tif Ptr": { "Description": "Tiffin", "Category": "Tiffin" },
+  "Adv": { "Description": "Pinu", "Category": "Transport" },
+  "Pinu": { "Description": "Pinu", "Category": "Transport" },
+  "Bike": { "Description": "Bike", "Category": "Transport" },
+  "Bharat": { "Description": "Bharat", "Category": "Bharat" },
+  "Weed ptr": { "Description": "Weed Petrol", "Category": "Weed" },
+  "Weed": { "Description": "Weed", "Category": "Weed" },
+  "wd": { "Description": "Weed", "Category": "Weed" },
+  "Tif": { "Description": "Tiffin", "Category": "Tiffin" },
+  "Gas": { "Description": "Gas", "Category": "Transport" },
+  "Plants": { "Description": "Plants", "Category": "Plants" },
+  "Seeds": { "Description": "Seeds", "Category": "Seeds" },
+  "Help": { "Description": "Helper", "Category": "Helper" },
+  "Helper": { "Description": "Helper", "Category": "Helper" },
+  "Nanu": { "Description": "Nanu", "Category": "Nanu" },
+  "Suresh": { "Description": "Suresh", "Category": "Suresh" },
+  "Jeev": { "Description": "Jeevamrut", "Category": "Fertilizer" },
+  "Tempo Ptr": { "Description": "Tempo Petrol", "Category": "Transport" }
+}
+
+
+
 def read_excel_statement(excel_path):
     """
     Read the Excel account statement and extract transaction data
@@ -17,7 +45,7 @@ def read_excel_statement(excel_path):
         print(f"Columns: {list(df.columns)}")
         
         # Display first few rows to understand structure
-        print("\nFirst 5 rows (starting from row 23):")
+        print("\nFirst 5 rows (starting from row 20):")
         print(df.head())
         
         return df
@@ -84,40 +112,54 @@ def group_transactions_by_narration_suffix(df):
         if "STATEMENT SUMMARY  :-" in row["Date"]:
             break
 
-        if len(narration) >= 3:
-            suffix = narration[-3:].upper()
+        matched_key = None
+        for key in abbreviation_map.keys():
+            if key.lower() in narration.lower():
+                matched_key = key
+                break
+
+        print(f'Matched Key {matched_key}!!!!!!!!!!!!!')
+        if matched_key:
+            group_key = matched_key
+            group_value = abbreviation_map.values(group_key)
+        else:
+            group_key = "Other"
+            group_value = { "Description": "NA", "Category": "NA" }
+
             
             # Get withdrawal and deposit amounts
-            withdrawal = 0
-            deposit = 0
-            
-            if withdrawal_col and pd.notna(row[withdrawal_col]):
-                try:
-                    withdrawal = float(str(row[withdrawal_col]).replace(',', ''))
-                except:
-                    withdrawal = 0
-            
-            if deposit_col and pd.notna(row[deposit_col]):
-                try:
-                    deposit = float(str(row[deposit_col]).replace(',', ''))
-                except:
-                    deposit = 0
-            
-            # Add to grouped data
-            if withdrawal > 0:
-                grouped_data[suffix]['withdrawals'].append(withdrawal)
-            if deposit > 0:
-                grouped_data[suffix]['deposits'].append(deposit)
-            
-            # Store full transaction details
-            transaction_info = {
-                'Index': index,
-                'Narration': narration,
-                'Withdrawal': withdrawal,
-                'Deposit': deposit,
-                'Suffix': suffix
-            }
-            grouped_data[suffix]['transactions'].append(transaction_info)
+        withdrawal = 0
+        deposit = 0
+        
+        if withdrawal_col and pd.notna(row[withdrawal_col]):
+            try:
+                withdrawal = float(str(row[withdrawal_col]).replace(',', ''))
+            except:
+                withdrawal = 0
+        
+        if deposit_col and pd.notna(row[deposit_col]):
+            try:
+                deposit = float(str(row[deposit_col]).replace(',', ''))
+            except:
+                deposit = 0
+        
+        # Add to grouped data
+        if withdrawal > 0:
+            grouped_data[group_key]['withdrawals'].append(withdrawal)
+        if deposit > 0:
+            grouped_data[group_key]['deposits'].append(deposit)
+        
+        # Store full transaction details
+        transaction_info = {
+            'Index': index,
+            'Narration': narration,
+            'Withdrawal': withdrawal,
+            'Deposit': deposit,
+            'group_key': group_key,
+            'group_description': group_value.get("Description"),
+            'group_category': group_value.get("Category")
+        }
+        grouped_data[group_key]['transactions'].append(transaction_info)
     
     return grouped_data
 
