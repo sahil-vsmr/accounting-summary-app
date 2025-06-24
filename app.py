@@ -48,8 +48,10 @@ def group_transactions_by_narration_suffix(df):
         try:
             # User-added logic to skip summary rows at the end of the statement
             date_val = str(row[date_column_name])
-            if '****' in date_val or "STATEMENT SUMMARY" in date_val:
+            if '****' in date_val:
                 continue
+            if "STATEMENT SUMMARY" in date_val:
+                break
         except KeyError:
             # Handle case where the column doesn't exist in a row, though unlikely with dataframes
             continue
@@ -105,12 +107,12 @@ def create_excel_output_bytes(grouped_data):
         group_key = data_key.split('-')[-1].strip()
 
         if group_key in abbreviation_map:
-            description = abbreviation_map[group_key]['Description'],
+            description = abbreviation_map[group_key]['Description']
             category = abbreviation_map[group_key]['Category']
         else:
-            description = 'NA',
+            description = 'NA'
             category = 'NA'
-            
+        
         excel_data.append({
             'Data_Key': data_key,
             'Description': description,
