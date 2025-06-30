@@ -128,9 +128,17 @@ def create_excel_output_bytes(grouped_data):
         df_summary.to_excel(writer, sheet_name='Grouped_Transactions', index=False)
         worksheet = writer.sheets['Grouped_Transactions']
         for column in worksheet.columns:
-            max_length = max(len(str(cell.value)) for cell in column if cell.value)
-            adjusted_width = min(max_length + 2, 50)
-            worksheet.column_dimensions[column[0].column_letter].width = adjusted_width
+            col_letter = column[0].column_letter
+            header = column[0].value
+            if header == "Narration":
+                # Set a fixed width and enable text wrap
+                worksheet.column_dimensions[col_letter].width = 30  # or any width you prefer
+                for cell in column:
+                    cell.alignment = cell.alignment.copy(wrapText=True)
+            else: 
+                max_length = max(len(str(cell.value)) for cell in column if cell.value)
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column[0].column_letter].width = adjusted_width
             
     return output.getvalue(), df_summary
 
