@@ -89,9 +89,8 @@ def group_transactions_by_narration_suffix(df):
             except (ValueError, TypeError):
                 pass # Keep as 0
 
-        
-        data_key = f'{date} - {group_key}'
-
+        narration_key = narration.replace('-', '_')
+        data_key = f'{narration_key} - {date} - {group_key}'
         if withdrawal > 0:
             grouped_data[data_key]['withdrawals'] = withdrawal
 
@@ -114,13 +113,15 @@ def create_excel_output_bytes(grouped_data):
             category = 'NA'
         
         excel_data.append({
-            'Data_Key': data_key,
+            'Date': data_key.split('-')[1].strip(),
+            'Narration': data_key.split('-')[0].strip(),
+            'Tag': data_key.split('-')[-1].strip(),
             'Description': description,
             "Category": category,
             'Total_Withdrawal': total_withdrawal
         })
     
-    df_summary = pd.DataFrame(excel_data).sort_values('Data_Key').reset_index(drop=True)
+    df_summary = pd.DataFrame(excel_data).sort_values('Date').reset_index(drop=True)
     
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -138,7 +139,7 @@ def create_excel_output_bytes(grouped_data):
 st.title("📂 Excel Account Statement Grouper")
 st.write("Upload your account statement in Excel format. The app will group transactions by the last 3 letters of the narration and generate a summary file for you to download.")
 
-uploaded_file = st.file_uploader("Choose an Excel file", type="xlsx")
+uploaded_file = st.file_uploader("Choose an Excel file", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
     st.success(f"File '{uploaded_file.name}' uploaded successfully!")

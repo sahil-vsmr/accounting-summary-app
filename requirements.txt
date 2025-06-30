@@ -2,3 +2,4 @@ pandas
 pdfplumber
 openpyxl
 streamlit
+xlrd
